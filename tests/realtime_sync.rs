@@ -150,25 +150,40 @@ fn lamport_ties_break_deterministically() {
     assert_eq!(r1.docs()["x"]["owner"], json!("B"));
 }
 
-/// Live two-collection realtime sync over an actual CE node. Requires `ce start` (or any node on
-/// `CE_API_URL`). Ignored by default so CI stays green without infrastructure.
+/// Live realtime sync between two readers via the `watch`/`next_change` realtime path, over a real
+/// 2-node loopback mesh. No longer `#[ignore]`d: it spins its OWN ephemeral nodes via the harness
+/// (never the operator's :8844 node) and skips gracefully — logging the reason — when the release
+/// binary is absent.
 ///
-/// Run with: `cargo test --test realtime_sync -- --ignored --nocapture`.
+/// Uses the realtime `watch()` receiver (the building block `onSnapshot`-style listeners loop on):
+/// a write on node A wakes node B's watch and the reader converges. The broader two-node field-LWW /
+/// query / capability / snapshot coverage lives in `tests/live.rs`; this asserts the realtime
+/// `next_change` notification path specifically.
+///
+/// (A single-node self-following reader is intentionally NOT used here: a `Merged` reader following
+/// its own node's writer log has no peer to catch up from over the mesh, so the realistic two-device
+/// topology is the one under test.)
+#[path = "harness/mod.rs"]
+mod harness;
+
 #[tokio::test]
-#[ignore = "requires a running CE node"]
 async fn live_two_reader_realtime_sync() -> anyhow::Result<()> {
     use ce_coord::Coord;
     use ce_db::Collection;
     use std::time::Duration;
 
-    // Both replicas run against the same local node here (one process, two Collections following each
-    // other's writes). On separate machines you would point each at its own node and pass the other's
-    // NodeId — the code path is identical.
-    let coord = Coord::connect().await?;
-    let me = coord.node_id().to_string();
+    if !harness::live_available() {
+        return Ok(());
+    }
+    let a = harness::Node::start(None).await?;
+    let b = harness::Node::start(Some(&a.dial_addr())).await?;
+    tokio::time::sleep(Duration::from_secs(3)).await;
+    let ca = Coord::with_client(a.client.clone()).await?;
+    let cb = Coord::with_client(b.client.clone()).await?;
 
-    let writer = Collection::open(&coord, "live-users", &[]).await?;
-    let reader = Collection::open(&coord, "live-users", std::slice::from_ref(&me)).await?;
+    // B's collection follows A's writer log; A writes, B's realtime watch wakes and converges.
+    let writer = Collection::open(&ca, "live-users", &[]).await?;
+    let reader = Collection::open(&cb, "live-users", std::slice::from_ref(&a.node_id)).await?;
 
     let mut rx = reader.watch();
 
@@ -176,9 +191,11 @@ async fn live_two_reader_realtime_sync() -> anyhow::Result<()> {
         .set("ada", json!({"name": "Ada", "age": 36}).as_object().unwrap().clone())
         .await?;
 
-    // Wait for the reader to converge (the pump is ~250ms; give it room).
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    // Loop on the realtime watch path: each change wakes us, then we re-read. Refresh nudges a pull
+    // in case a watch frame was coalesced.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
     loop {
+        reader.refresh();
         if reader.get("ada").is_some() {
             break;
         }
@@ -187,7 +204,7 @@ async fn live_two_reader_realtime_sync() -> anyhow::Result<()> {
             _ = tokio::time::sleep(Duration::from_millis(300)) => {}
         }
         if tokio::time::Instant::now() > deadline {
-            anyhow::bail!("reader did not converge within 10s");
+            anyhow::bail!("reader did not converge within 30s");
         }
     }
 
