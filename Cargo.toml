@@ -1,0 +1,37 @@
+[package]
+name = "ce-db"
+version = "0.1.0"
+edition = "2024"
+description = "ce-db — a Firestore-class realtime document database over CE. Collections of JSON documents backed by ce-coord Merged (multi-writer CRDT convergence) + Snapshot bootstrap, with realtime watch over the mesh and per-collection capability gating via ce-cap. An SDK/app-tier library, not a node change."
+license = "MIT"
+repository = "https://github.com/ce-net/ce-db"
+authors = ["Leif Rydenfalk <ledamecrydenfalk@gmail.com>"]
+keywords = ["ce", "firestore", "document-database", "crdt", "realtime"]
+categories = ["database", "api-bindings"]
+
+[lib]
+name = "ce_db"
+path = "src/lib.rs"
+
+[[bin]]
+name = "ce-db"
+path = "src/bin/ce_db.rs"
+
+[dependencies]
+# CE substrate, all by path per the task contract (over ce-rs + ce-cap; ce-coord supplies Merged/Snapshot).
+ce-rs = { path = "../ce-rs" }
+ce-cap = { path = "../ce/crates/ce-cap" }
+ce-coord = { path = "../ce-coord" }
+ce-identity = { path = "../ce/crates/ce-identity" }
+
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "test-util"] }
