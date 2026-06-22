@@ -327,9 +327,13 @@ fn ce_data_dir() -> Result<std::path::PathBuf> {
 }
 
 fn directories_base() -> Result<std::path::PathBuf> {
-    // Mirror the node's default: ~/.local/share/ce on Linux/mac.
-    let home = std::env::var("HOME").map_err(|_| anyhow!("HOME not set; set CE_DATA_DIR"))?;
-    Ok(std::path::PathBuf::from(home).join(".local").join("share").join("ce"))
+    // Platform-native data dir via the `directories` crate (matches ce-storage / ce-pubsub):
+    // `~/.local/share/ce` on Linux, `~/Library/Application Support/ce` on macOS,
+    // `%APPDATA%\ce` on Windows. `$HOME` is unset on Windows, so don't hardcode it; the
+    // `CE_DATA_DIR` override is handled by the caller (`ce_data_dir`).
+    directories::ProjectDirs::from("", "", "ce")
+        .map(|p| p.data_dir().to_path_buf())
+        .ok_or_else(|| anyhow!("could not resolve a platform data dir; set CE_DATA_DIR"))
 }
 
 fn print_snapshot(snap: &ce_db::Snapshot) {

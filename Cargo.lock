@@ -188,6 +188,7 @@ dependencies = [
  "ce-identity",
  "ce-rs",
  "clap",
+ "directories",
  "hex",
  "proptest",
  "reqwest",
