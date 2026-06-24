@@ -40,7 +40,7 @@
 //! assert_eq!(ada["email"], json!("ada@x"));
 //!
 //! // Query: everyone older than 30.
-//! let q = Query::new().with(Filter { field: "age".into(), op: ce_db::Op::Gt, value: json!(30) });
+//! let q = Query::new().with(Filter::new("age", ce_db::Op::Gt, json!(30)));
 //! for (id, doc) in users.query(&q) { println!("{id}: {doc:?}"); }
 //!
 //! // Realtime: react to every change (local or from a peer).
@@ -55,16 +55,22 @@
 //! `tests/realtime_sync.rs` for the two-reader realtime-convergence proof.
 
 pub mod access;
+pub mod batch;
 pub mod collection;
 pub mod doc;
+pub mod guard;
+pub mod limits;
 pub mod query;
 
 pub use access::{
     ABILITY_ADMIN, ABILITY_READ, ABILITY_WRITE, CollectionGrant, node_id_from_hex, node_id_hex,
 };
-pub use collection::{Collection, Snapshot};
-pub use doc::{DbMachine, DocOp, Document, OpKey, OpKind};
-pub use query::{Dir, Filter, Op, Query};
+pub use batch::WriteBatch;
+pub use collection::{ChangeKind, ChangeStream, Collection, DocChange, Snapshot};
+pub use doc::{DbMachine, DocMeta, DocOp, Document, FieldOp, OpKey, OpKind};
+pub use guard::{AuthPolicy, GuardedCollection};
+pub use limits::Limits;
+pub use query::{Cursor, Dir, Filter, Op, OrderBy, Query};
 
 // Re-export the substrate types callers most often touch, so an app needs only `ce_db` on its deps.
 pub use ce_cap::Resource;
@@ -89,9 +95,14 @@ impl DocPath {
             .split_once('/')
             .ok_or_else(|| anyhow!("path must be '<collection>/<doc_id>', got '{path}'"))?;
         if collection.is_empty() || doc_id.is_empty() {
-            return Err(anyhow!("collection and doc id must both be non-empty in '{path}'"));
+            return Err(anyhow!(
+                "collection and doc id must both be non-empty in '{path}'"
+            ));
         }
-        Ok(DocPath { collection: collection.to_string(), doc_id: doc_id.to_string() })
+        Ok(DocPath {
+            collection: collection.to_string(),
+            doc_id: doc_id.to_string(),
+        })
     }
 }
 

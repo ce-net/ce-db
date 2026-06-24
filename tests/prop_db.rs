@@ -11,14 +11,14 @@ use std::collections::BTreeMap;
 
 use ce_cap::Resource;
 use ce_coord::MergeMachine;
-use ce_db::{
-    CollectionGrant, DbMachine, DocOp, Document, OpKey, OpKind, Query, Filter, DocPath,
-    ABILITY_READ, ABILITY_WRITE,
-};
 use ce_db::query::{Dir, Op};
+use ce_db::{
+    ABILITY_READ, ABILITY_WRITE, CollectionGrant, DbMachine, DocOp, DocPath, Document, Filter,
+    OpKey, OpKind, Query,
+};
 use ce_identity::{Identity, NodeId};
 use proptest::prelude::*;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 fn ident() -> Identity {
@@ -53,11 +53,11 @@ fn fold(ops: &[DocOp]) -> BTreeMap<String, Document> {
 /// requirement). Uniqueness is enforced by giving each op a fresh lamport from a shared counter.
 fn op_strategy() -> impl Strategy<Value = (u64, String, String, OpKind)> {
     (
-        0u64..5,                       // writer index (becomes the writer id "wN")
+        0u64..5,                                      // writer index (becomes the writer id "wN")
         prop::sample::select(vec!["d1", "d2", "d3"]), // doc id
-        0u8..3,                        // kind selector
-        prop::sample::select(vec!["a", "b", "c"]),     // field
-        any::<i64>(),                  // value
+        0u8..3,                                       // kind selector
+        prop::sample::select(vec!["a", "b", "c"]),    // field
+        any::<i64>(),                                 // value
     )
         .prop_map(|(w, doc, kind_sel, field, val)| {
             let writer = format!("w{w}");
@@ -84,7 +84,10 @@ fn key_ops(raw: Vec<(u64, String, String, OpKind)>) -> Vec<DocOp> {
     raw.into_iter()
         .enumerate()
         .map(|(i, (_l, writer, doc_id, kind))| DocOp {
-            key: OpKey { lamport: (i as u64) + 1, writer },
+            key: OpKey {
+                lamport: (i as u64) + 1,
+                writer,
+            },
             doc_id,
             kind,
         })
@@ -219,7 +222,7 @@ proptest! {
             o.insert("n".into(), json!(val));
         }
         let docs = vec![("d".to_string(), o)];
-        let ne = Query::new().with(Filter { field: "n".into(), op: Op::Ne, value: json!(999999) });
+        let ne = Query::new().with(Filter::new("n", Op::Ne, json!(999999)));
         let eq = Query::new().with(Filter::eq("n", json!(999999)));
         // Ne matches unless the field is present AND equals 999999.
         let ne_expect = !(present && val == 999999);
@@ -323,6 +326,6 @@ fn incomparable_filter_is_false_not_panic() {
     let mut o = Document::new();
     o.insert("x".into(), json!("a string"));
     let docs = vec![("d".to_string(), o)];
-    let q = Query::new().with(Filter { field: "x".into(), op: Op::Gt, value: Value::Number(5.into()) });
+    let q = Query::new().with(Filter::new("x", Op::Gt, Value::Number(5.into())));
     assert_eq!(q.run(docs).len(), 0);
 }

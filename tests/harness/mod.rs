@@ -32,14 +32,12 @@ fn offset() -> u16 {
 }
 
 fn free_api_port() -> u16 {
-    let _ = API_PORT
-        .compare_exchange(18960, 18960 + offset(), Ordering::SeqCst, Ordering::SeqCst);
+    let _ = API_PORT.compare_exchange(18960, 18960 + offset(), Ordering::SeqCst, Ordering::SeqCst);
     free_port(&API_PORT, 18960, 18999, false)
 }
 
 fn free_p2p_port() -> u16 {
-    let _ = P2P_PORT
-        .compare_exchange(14960, 14960 + offset(), Ordering::SeqCst, Ordering::SeqCst);
+    let _ = P2P_PORT.compare_exchange(14960, 14960 + offset(), Ordering::SeqCst, Ordering::SeqCst);
     free_port(&P2P_PORT, 14960, 14999, true)
 }
 
@@ -90,11 +88,8 @@ impl Node {
     pub async fn start(bootstrap: Option<&str>) -> anyhow::Result<Node> {
         let api_port = free_api_port();
         let p2p_port = free_p2p_port();
-        let data_dir = std::env::temp_dir().join(format!(
-            "ce-db-test-{}-{}",
-            std::process::id(),
-            api_port
-        ));
+        let data_dir =
+            std::env::temp_dir().join(format!("ce-db-test-{}-{}", std::process::id(), api_port));
         std::fs::create_dir_all(&data_dir)?;
 
         let mut cmd = Command::new(CE_BIN);

@@ -13,8 +13,8 @@
 
 use std::collections::BTreeMap;
 
-use ce_db::{DbMachine, DocOp, OpKey, OpKind};
 use ce_coord::MergeMachine;
+use ce_db::{DbMachine, DocOp, OpKey, OpKind};
 use serde_json::json;
 
 /// A tiny in-memory stand-in for a device's replica: it accumulates the ops it has "received" (its
@@ -50,7 +50,10 @@ impl Replica {
 
 fn set(l: u64, w: &str, id: &str, v: serde_json::Value) -> DocOp {
     DocOp {
-        key: OpKey { lamport: l, writer: w.into() },
+        key: OpKey {
+            lamport: l,
+            writer: w.into(),
+        },
         doc_id: id.into(),
         kind: OpKind::Set(v.as_object().cloned().unwrap()),
     }
@@ -58,7 +61,10 @@ fn set(l: u64, w: &str, id: &str, v: serde_json::Value) -> DocOp {
 
 fn patch(l: u64, w: &str, id: &str, v: serde_json::Value) -> DocOp {
     DocOp {
-        key: OpKey { lamport: l, writer: w.into() },
+        key: OpKey {
+            lamport: l,
+            writer: w.into(),
+        },
         doc_id: id.into(),
         kind: OpKind::Patch(v.as_object().cloned().unwrap()),
     }
@@ -112,7 +118,14 @@ fn late_reader_replay_equals_live_reader() {
         set(1, "A", "u1", json!({"v": 1})),
         set(2, "A", "u2", json!({"v": 2})),
         patch(3, "B", "u1", json!({"w": 9})),
-        DocOp { key: OpKey { lamport: 4, writer: "A".into() }, doc_id: "u2".into(), kind: OpKind::Delete },
+        DocOp {
+            key: OpKey {
+                lamport: 4,
+                writer: "A".into(),
+            },
+            doc_id: "u2".into(),
+            kind: OpKind::Delete,
+        },
     ];
 
     let mut live = Replica::default();
@@ -188,7 +201,13 @@ async fn live_two_reader_realtime_sync() -> anyhow::Result<()> {
     let mut rx = reader.watch();
 
     writer
-        .set("ada", json!({"name": "Ada", "age": 36}).as_object().unwrap().clone())
+        .set(
+            "ada",
+            json!({"name": "Ada", "age": 36})
+                .as_object()
+                .unwrap()
+                .clone(),
+        )
         .await?;
 
     // Loop on the realtime watch path: each change wakes us, then we re-read. Refresh nudges a pull

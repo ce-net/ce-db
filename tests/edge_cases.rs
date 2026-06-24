@@ -6,11 +6,11 @@ use std::collections::BTreeMap;
 
 use ce_cap::Resource;
 use ce_coord::MergeMachine;
-use ce_db::{
-    CollectionGrant, DbMachine, DocOp, Document, OpKey, OpKind, Query, Filter, DocPath, Snapshot,
-    ABILITY_READ, ABILITY_WRITE,
-};
 use ce_db::query::{Dir, Op};
+use ce_db::{
+    ABILITY_READ, ABILITY_WRITE, CollectionGrant, DbMachine, DocOp, DocPath, Document, Filter,
+    OpKey, OpKind, Query, Snapshot,
+};
 use ce_identity::{Identity, NodeId};
 use serde_json::json;
 
@@ -31,7 +31,10 @@ fn doc(v: serde_json::Value) -> Document {
 }
 
 fn key(l: u64, w: &str) -> OpKey {
-    OpKey { lamport: l, writer: w.into() }
+    OpKey {
+        lamport: l,
+        writer: w.into(),
+    }
 }
 
 fn fold(ops: &[DocOp]) -> DbMachine {
@@ -56,7 +59,7 @@ fn comparison_across_incomparable_types_is_false() {
         ("c".to_string(), doc(json!({"v": true}))),
     ];
     // Gt against a number: only the numeric doc can compare; string/bool are incomparable → excluded.
-    let q = Query::new().with(Filter { field: "v".into(), op: Op::Gt, value: json!(1) });
+    let q = Query::new().with(Filter::new("v", Op::Gt, json!(1)));
     let ids: Vec<String> = q.run(docs).into_iter().map(|(id, _)| id).collect();
     assert_eq!(ids, vec!["b"]);
 }
@@ -68,28 +71,64 @@ fn order_puts_missing_field_last_asc_first_desc() {
         ("b".to_string(), doc(json!({}))), // missing n
         ("c".to_string(), doc(json!({"n": 1}))),
     ];
-    let asc: Vec<String> =
-        Query::new().order("n", Dir::Asc).run(docs.clone()).into_iter().map(|(id, _)| id).collect();
+    let asc: Vec<String> = Query::new()
+        .order("n", Dir::Asc)
+        .run(docs.clone())
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
     assert_eq!(asc, vec!["c", "a", "b"], "missing sorts last ascending");
-    let desc: Vec<String> =
-        Query::new().order("n", Dir::Desc).run(docs).into_iter().map(|(id, _)| id).collect();
+    let desc: Vec<String> = Query::new()
+        .order("n", Dir::Desc)
+        .run(docs)
+        .into_iter()
+        .map(|(id, _)| id)
+        .collect();
     assert_eq!(desc, vec!["b", "a", "c"], "missing sorts first descending");
 }
 
 #[test]
 fn contains_on_non_container_is_false() {
     let docs = vec![("a".to_string(), doc(json!({"v": 42})))];
-    let q = Query::new().with(Filter { field: "v".into(), op: Op::Contains, value: json!(4) });
-    assert_eq!(q.run(docs).len(), 0, "Contains on a number is false, not a panic");
+    let q = Query::new().with(Filter::new("v", Op::Contains, json!(4)));
+    assert_eq!(
+        q.run(docs).len(),
+        0,
+        "Contains on a number is false, not a panic"
+    );
 }
 
 #[test]
 fn le_ge_boundary_inclusive() {
     let docs = vec![("a".to_string(), doc(json!({"n": 5})))];
-    assert_eq!(Query::new().with(Filter { field: "n".into(), op: Op::Le, value: json!(5) }).run(docs.clone()).len(), 1);
-    assert_eq!(Query::new().with(Filter { field: "n".into(), op: Op::Ge, value: json!(5) }).run(docs.clone()).len(), 1);
-    assert_eq!(Query::new().with(Filter { field: "n".into(), op: Op::Lt, value: json!(5) }).run(docs.clone()).len(), 0);
-    assert_eq!(Query::new().with(Filter { field: "n".into(), op: Op::Gt, value: json!(5) }).run(docs).len(), 0);
+    assert_eq!(
+        Query::new()
+            .with(Filter::new("n", Op::Le, json!(5)))
+            .run(docs.clone())
+            .len(),
+        1
+    );
+    assert_eq!(
+        Query::new()
+            .with(Filter::new("n", Op::Ge, json!(5)))
+            .run(docs.clone())
+            .len(),
+        1
+    );
+    assert_eq!(
+        Query::new()
+            .with(Filter::new("n", Op::Lt, json!(5)))
+            .run(docs.clone())
+            .len(),
+        0
+    );
+    assert_eq!(
+        Query::new()
+            .with(Filter::new("n", Op::Gt, json!(5)))
+            .run(docs)
+            .len(),
+        0
+    );
 }
 
 #[test]
@@ -106,8 +145,16 @@ fn limit_zero_returns_empty() {
 #[test]
 fn patch_null_deletes_only_that_field() {
     let m = fold(&[
-        DocOp { key: key(1, "a"), doc_id: "d".into(), kind: OpKind::Set(doc(json!({"x": 1, "y": 2}))) },
-        DocOp { key: key(2, "a"), doc_id: "d".into(), kind: OpKind::Patch(doc(json!({"x": null}))) },
+        DocOp {
+            key: key(1, "a"),
+            doc_id: "d".into(),
+            kind: OpKind::Set(doc(json!({"x": 1, "y": 2}))),
+        },
+        DocOp {
+            key: key(2, "a"),
+            doc_id: "d".into(),
+            kind: OpKind::Patch(doc(json!({"x": null}))),
+        },
     ]);
     let d = m.get("d").unwrap();
     assert!(!d.contains_key("x"), "null patch deleted x");
@@ -116,8 +163,16 @@ fn patch_null_deletes_only_that_field() {
 
 #[test]
 fn older_set_after_delete_stays_deleted_either_order() {
-    let s = DocOp { key: key(1, "a"), doc_id: "d".into(), kind: OpKind::Set(doc(json!({"v": 1}))) };
-    let del = DocOp { key: key(5, "b"), doc_id: "d".into(), kind: OpKind::Delete };
+    let s = DocOp {
+        key: key(1, "a"),
+        doc_id: "d".into(),
+        kind: OpKind::Set(doc(json!({"v": 1}))),
+    };
+    let del = DocOp {
+        key: key(5, "b"),
+        doc_id: "d".into(),
+        kind: OpKind::Delete,
+    };
     assert!(fold(&[s.clone(), del.clone()]).get("d").is_none());
     assert!(fold(&[del, s]).get("d").is_none());
 }
@@ -154,7 +209,7 @@ fn snapshot_query_and_get() {
     assert_eq!(snap.len(), 2);
     assert!(!snap.is_empty());
     assert_eq!(snap.get("u1").unwrap()["age"], json!(36));
-    let q = Query::new().with(Filter { field: "age".into(), op: Op::Gt, value: json!(30) });
+    let q = Query::new().with(Filter::new("age", Op::Gt, json!(30)));
     assert_eq!(snap.query(&q).len(), 1);
 }
 
@@ -186,21 +241,68 @@ fn non_holder_cannot_attenuate() {
     let mid = ident("m");
     let stranger = ident("s");
     let leaf = ident("l");
-    let g = CollectionGrant::mint(&owner, mid.node_id(), "c", &[ABILITY_READ], Resource::Any, 0, 1);
+    let g = CollectionGrant::mint(
+        &owner,
+        mid.node_id(),
+        "c",
+        &[ABILITY_READ],
+        Resource::Any,
+        0,
+        1,
+    );
     // A stranger (not the leaf audience) cannot attenuate the chain.
-    assert!(g.attenuate(&stranger, leaf.node_id(), &[ABILITY_READ], Resource::Any, 0, 2).is_err());
+    assert!(
+        g.attenuate(
+            &stranger,
+            leaf.node_id(),
+            &[ABILITY_READ],
+            Resource::Any,
+            0,
+            2
+        )
+        .is_err()
+    );
 }
 
 #[test]
 fn revoked_grant_is_denied() {
     let owner = ident("ro");
     let peer = ident("rp");
-    let g = CollectionGrant::mint(&owner, peer.node_id(), "c", &[ABILITY_WRITE], Resource::Any, 0, 77);
+    let g = CollectionGrant::mint(
+        &owner,
+        peer.node_id(),
+        "c",
+        &[ABILITY_WRITE],
+        Resource::Any,
+        0,
+        77,
+    );
     let revoke_77 = |_i: &NodeId, n: u64| n == 77;
-    let r = g.verify(&owner.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_WRITE, "c", &revoke_77);
+    let r = g.verify(
+        &owner.node_id(),
+        &[],
+        &[],
+        1000,
+        &peer.node_id(),
+        ABILITY_WRITE,
+        "c",
+        &revoke_77,
+    );
     assert!(r.is_err(), "a revoked grant must be denied");
     // Same grant verifies when nothing is revoked.
-    assert!(g.verify(&owner.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_WRITE, "c", &never).is_ok());
+    assert!(
+        g.verify(
+            &owner.node_id(),
+            &[],
+            &[],
+            1000,
+            &peer.node_id(),
+            ABILITY_WRITE,
+            "c",
+            &never
+        )
+        .is_ok()
+    );
 }
 
 #[test]
@@ -209,8 +311,28 @@ fn unrelated_root_denies() {
     let owner = ident("u1");
     let other = ident("u2");
     let peer = ident("up");
-    let g = CollectionGrant::mint(&owner, peer.node_id(), "c", &[ABILITY_READ], Resource::Any, 0, 1);
+    let g = CollectionGrant::mint(
+        &owner,
+        peer.node_id(),
+        "c",
+        &[ABILITY_READ],
+        Resource::Any,
+        0,
+        1,
+    );
     // Enforcing node is `other`, accepting no extra roots → owner's chain is not rooted here.
-    let r = g.verify(&other.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_READ, "c", &never);
-    assert!(r.is_err(), "a chain rooted at an unaccepted key must be denied");
+    let r = g.verify(
+        &other.node_id(),
+        &[],
+        &[],
+        1000,
+        &peer.node_id(),
+        ABILITY_READ,
+        "c",
+        &never,
+    );
+    assert!(
+        r.is_err(),
+        "a chain rooted at an unaccepted key must be denied"
+    );
 }

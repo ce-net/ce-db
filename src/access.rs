@@ -25,7 +25,9 @@
 //!    requested action **without contacting the owner** — offline, in microseconds.
 
 use anyhow::{Result, anyhow};
-use ce_cap::{Capability, Caveats, Resource, SignedCapability, authorize, decode_chain, encode_chain};
+use ce_cap::{
+    Capability, Caveats, Resource, SignedCapability, authorize, decode_chain, encode_chain,
+};
 use ce_identity::{Identity, NodeId};
 
 /// Read/query/watch a collection.
@@ -38,7 +40,9 @@ pub const ABILITY_ADMIN: &str = "db:admin";
 /// Decode a 64-hex NodeId string into the raw [`NodeId`].
 pub fn node_id_from_hex(hex_str: &str) -> Result<NodeId> {
     let bytes = hex::decode(hex_str.trim()).map_err(|_| anyhow!("node id is not valid hex"))?;
-    bytes.try_into().map_err(|_| anyhow!("node id must be 32 bytes (64 hex chars)"))
+    bytes
+        .try_into()
+        .map_err(|_| anyhow!("node id must be 32 bytes (64 hex chars)"))
 }
 
 /// Hex-encode a [`NodeId`].
@@ -84,7 +88,10 @@ impl CollectionGrant {
             nonce,
             None,
         );
-        CollectionGrant { chain: vec![cap], collection: collection.to_string() }
+        CollectionGrant {
+            chain: vec![cap],
+            collection: collection.to_string(),
+        }
     }
 
     /// Attenuate the grant the holder owns, re-delegating a *subset* to `audience`. `narrower` must
@@ -122,7 +129,10 @@ impl CollectionGrant {
         );
         let mut chain = self.chain.clone();
         chain.push(child);
-        Ok(CollectionGrant { chain, collection: self.collection.clone() })
+        Ok(CollectionGrant {
+            chain,
+            collection: self.collection.clone(),
+        })
     }
 
     /// The collection this grant is pinned to.
@@ -149,7 +159,9 @@ impl CollectionGrant {
     /// from the leaf's caveat prefix.
     pub fn from_token(token: &str) -> Result<CollectionGrant> {
         let chain = decode_chain(token)?;
-        let leaf = chain.last().ok_or_else(|| anyhow!("empty capability chain"))?;
+        let leaf = chain
+            .last()
+            .ok_or_else(|| anyhow!("empty capability chain"))?;
         let collection = leaf
             .cap
             .caveats
@@ -184,8 +196,17 @@ impl CollectionGrant {
                 collection
             ));
         }
-        authorize(self_id, accepted_roots, self_tags, now, requester, action, &self.chain, is_revoked)
-            .map_err(|e| anyhow!(e))
+        authorize(
+            self_id,
+            accepted_roots,
+            self_tags,
+            now,
+            requester,
+            action,
+            &self.chain,
+            is_revoked,
+        )
+        .map_err(|e| anyhow!(e))
     }
 
     /// The raw underlying `ce-cap` chain (escape hatch for callers that need `ce-cap` directly).
@@ -242,13 +263,31 @@ mod tests {
         );
         // The owner is the enforcing node (self == root issuer) — verifies offline.
         assert!(
-            g.verify(&owner.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_WRITE, "users", &never)
-                .is_ok()
+            g.verify(
+                &owner.node_id(),
+                &[],
+                &[],
+                1000,
+                &peer.node_id(),
+                ABILITY_WRITE,
+                "users",
+                &never
+            )
+            .is_ok()
         );
         // Wrong collection is rejected.
         assert!(
-            g.verify(&owner.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_WRITE, "orders", &never)
-                .is_err()
+            g.verify(
+                &owner.node_id(),
+                &[],
+                &[],
+                1000,
+                &peer.node_id(),
+                ABILITY_WRITE,
+                "orders",
+                &never
+            )
+            .is_err()
         );
     }
 
@@ -256,21 +295,73 @@ mod tests {
     fn read_only_grant_denies_write() {
         let owner = ident("owner");
         let peer = ident("peer");
-        let g = CollectionGrant::mint(&owner, peer.node_id(), "users", &[ABILITY_READ], Resource::Any, 0, 1);
-        assert!(g.verify(&owner.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_READ, "users", &never).is_ok());
-        assert!(g.verify(&owner.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_WRITE, "users", &never).is_err());
+        let g = CollectionGrant::mint(
+            &owner,
+            peer.node_id(),
+            "users",
+            &[ABILITY_READ],
+            Resource::Any,
+            0,
+            1,
+        );
+        assert!(
+            g.verify(
+                &owner.node_id(),
+                &[],
+                &[],
+                1000,
+                &peer.node_id(),
+                ABILITY_READ,
+                "users",
+                &never
+            )
+            .is_ok()
+        );
+        assert!(
+            g.verify(
+                &owner.node_id(),
+                &[],
+                &[],
+                1000,
+                &peer.node_id(),
+                ABILITY_WRITE,
+                "users",
+                &never
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn token_roundtrips_and_pins_collection() {
         let owner = ident("owner");
         let peer = ident("peer");
-        let g = CollectionGrant::mint(&owner, peer.node_id(), "inbox", &[ABILITY_READ], Resource::Any, 0, 7);
+        let g = CollectionGrant::mint(
+            &owner,
+            peer.node_id(),
+            "inbox",
+            &[ABILITY_READ],
+            Resource::Any,
+            0,
+            7,
+        );
         let token = g.to_token();
         let back = CollectionGrant::from_token(&token).unwrap();
         assert_eq!(back.collection(), "inbox");
         assert_eq!(back.holder(), Some(peer.node_id()));
-        assert!(back.verify(&owner.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_READ, "inbox", &never).is_ok());
+        assert!(
+            back.verify(
+                &owner.node_id(),
+                &[],
+                &[],
+                1000,
+                &peer.node_id(),
+                ABILITY_READ,
+                "inbox",
+                &never
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -288,13 +379,40 @@ mod tests {
             1,
         );
         // mid re-delegates read-only to leaf.
-        let narrowed =
-            g.attenuate(&mid, leaf.node_id(), &[ABILITY_READ], Resource::Any, 0, 2).unwrap();
+        let narrowed = g
+            .attenuate(&mid, leaf.node_id(), &[ABILITY_READ], Resource::Any, 0, 2)
+            .unwrap();
         assert_eq!(narrowed.chain().len(), 2);
         // leaf may read.
-        assert!(narrowed.verify(&owner.node_id(), &[], &[], 1000, &leaf.node_id(), ABILITY_READ, "users", &never).is_ok());
+        assert!(
+            narrowed
+                .verify(
+                    &owner.node_id(),
+                    &[],
+                    &[],
+                    1000,
+                    &leaf.node_id(),
+                    ABILITY_READ,
+                    "users",
+                    &never
+                )
+                .is_ok()
+        );
         // leaf may NOT write — attenuation dropped that ability.
-        assert!(narrowed.verify(&owner.node_id(), &[], &[], 1000, &leaf.node_id(), ABILITY_WRITE, "users", &never).is_err());
+        assert!(
+            narrowed
+                .verify(
+                    &owner.node_id(),
+                    &[],
+                    &[],
+                    1000,
+                    &leaf.node_id(),
+                    ABILITY_WRITE,
+                    "users",
+                    &never
+                )
+                .is_err()
+        );
     }
 
     #[test]
@@ -302,10 +420,29 @@ mod tests {
         let owner = ident("owner");
         let mid = ident("mid");
         let leaf = ident("leaf");
-        let g = CollectionGrant::mint(&owner, mid.node_id(), "users", &[ABILITY_READ], Resource::Any, 0, 1);
+        let g = CollectionGrant::mint(
+            &owner,
+            mid.node_id(),
+            "users",
+            &[ABILITY_READ],
+            Resource::Any,
+            0,
+            1,
+        );
         // mid tries to grant write it never held.
-        let bad = g.attenuate(&mid, leaf.node_id(), &[ABILITY_WRITE], Resource::Any, 0, 2).unwrap();
-        let r = bad.verify(&owner.node_id(), &[], &[], 1000, &leaf.node_id(), ABILITY_WRITE, "users", &never);
+        let bad = g
+            .attenuate(&mid, leaf.node_id(), &[ABILITY_WRITE], Resource::Any, 0, 2)
+            .unwrap();
+        let r = bad.verify(
+            &owner.node_id(),
+            &[],
+            &[],
+            1000,
+            &leaf.node_id(),
+            ABILITY_WRITE,
+            "users",
+            &never,
+        );
         assert!(r.is_err());
     }
 
@@ -315,18 +452,68 @@ mod tests {
         let mid = ident("mid");
         let stranger = ident("stranger");
         let leaf = ident("leaf");
-        let g = CollectionGrant::mint(&owner, mid.node_id(), "users", &[ABILITY_READ], Resource::Any, 0, 1);
+        let g = CollectionGrant::mint(
+            &owner,
+            mid.node_id(),
+            "users",
+            &[ABILITY_READ],
+            Resource::Any,
+            0,
+            1,
+        );
         // stranger is not the leaf's audience.
-        assert!(g.attenuate(&stranger, leaf.node_id(), &[ABILITY_READ], Resource::Any, 0, 2).is_err());
+        assert!(
+            g.attenuate(
+                &stranger,
+                leaf.node_id(),
+                &[ABILITY_READ],
+                Resource::Any,
+                0,
+                2
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn expired_grant_is_denied() {
         let owner = ident("owner");
         let peer = ident("peer");
-        let g = CollectionGrant::mint(&owner, peer.node_id(), "users", &[ABILITY_READ], Resource::Any, 500, 1);
-        assert!(g.verify(&owner.node_id(), &[], &[], 1000, &peer.node_id(), ABILITY_READ, "users", &never).is_err());
-        assert!(g.verify(&owner.node_id(), &[], &[], 400, &peer.node_id(), ABILITY_READ, "users", &never).is_ok());
+        let g = CollectionGrant::mint(
+            &owner,
+            peer.node_id(),
+            "users",
+            &[ABILITY_READ],
+            Resource::Any,
+            500,
+            1,
+        );
+        assert!(
+            g.verify(
+                &owner.node_id(),
+                &[],
+                &[],
+                1000,
+                &peer.node_id(),
+                ABILITY_READ,
+                "users",
+                &never
+            )
+            .is_err()
+        );
+        assert!(
+            g.verify(
+                &owner.node_id(),
+                &[],
+                &[],
+                400,
+                &peer.node_id(),
+                ABILITY_READ,
+                "users",
+                &never
+            )
+            .is_ok()
+        );
     }
 
     #[test]
