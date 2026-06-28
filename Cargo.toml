@@ -19,10 +19,10 @@ path = "src/bin/ce_db.rs"
 
 [dependencies]
 # CE substrate, all by path per the task contract (over ce-rs + ce-cap; ce-coord supplies Merged/Snapshot).
-ce-rs = { path = "../ce-rs" }
-ce-cap = { path = "../ce/crates/ce-cap" }
-ce-coord = { path = "../ce-coord" }
-ce-identity = { path = "../ce/crates/ce-identity" }
+ce-rs = { git = "https://github.com/ce-net/ce-rs" }
+ce-iam-core = { git = "https://github.com/ce-net/ce-iam" }
+ce-coord = { git = "https://github.com/ce-net/ce-coord" }
+ce-identity = { git = "https://github.com/ce-net/ce" }
 
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync"] }
 anyhow = "1"
@@ -45,4 +45,4 @@ serde = { version = "1", features = ["derive"] }
 # instances and their `CeClient` types would not interoperate (so `Coord::with_client(node.client)`
 # would not typecheck). The path tree is the source of truth; this makes the whole graph use it.
 [patch."https://github.com/ce-net/ce-rs"]
-ce-rs = { path = "../ce-rs" }
+ce-rs = { git = "https://github.com/ce-net/ce-rs" }

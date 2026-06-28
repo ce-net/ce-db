@@ -9,7 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use ce_cap::Resource;
+use ce_iam_core::Resource;
 use ce_coord::MergeMachine;
 use ce_db::query::{Dir, Op};
 use ce_db::{

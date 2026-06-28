@@ -73,7 +73,7 @@ pub use limits::Limits;
 pub use query::{Cursor, Dir, Filter, Op, OrderBy, Query};
 
 // Re-export the substrate types callers most often touch, so an app needs only `ce_db` on its deps.
-pub use ce_cap::Resource;
+pub use ce_iam_core::Resource;
 pub use ce_coord::{Checkpoint, Coord};
 
 use anyhow::{Result, anyhow};

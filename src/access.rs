@@ -25,7 +25,7 @@
 //!    requested action **without contacting the owner** — offline, in microseconds.
 
 use anyhow::{Result, anyhow};
-use ce_cap::{
+use ce_iam_core::{
     Capability, Caveats, Resource, SignedCapability, authorize, decode_chain, encode_chain,
 };
 use ce_identity::{Identity, NodeId};
@@ -174,7 +174,7 @@ impl CollectionGrant {
 
     /// Verify, **locally and offline**, that `requester` may perform `action` (`db:read`/`db:write`/
     /// `db:admin`) on `collection` at this enforcing node, given the accepted root keys and the
-    /// current time. Delegates the heavy lifting to [`ce_cap::authorize`] and additionally checks the
+    /// current time. Delegates the heavy lifting to [`ce_iam_core::authorize`] and additionally checks the
     /// grant is pinned to the requested collection. `is_revoked` consults the on-chain revocation set
     /// (pass a closure returning `false` to skip).
     #[allow(clippy::too_many_arguments)]

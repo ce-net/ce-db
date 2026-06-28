@@ -7,7 +7,7 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use ce_cap::Resource;
+use ce_iam_core::Resource;
 use ce_db::guard::never_revoked;
 use ce_db::{ABILITY_ADMIN, ABILITY_READ, ABILITY_WRITE, AuthPolicy, CollectionGrant};
 use ce_identity::{Identity, NodeId};

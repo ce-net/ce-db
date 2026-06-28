@@ -20,7 +20,7 @@ mod harness;
 
 use std::time::Duration;
 
-use ce_cap::Resource;
+use ce_iam_core::Resource;
 use ce_coord::Coord;
 use ce_db::{ABILITY_READ, ABILITY_WRITE, Collection, CollectionGrant, Dir, Filter, Op, Query};
 use harness::{Node, live_available};

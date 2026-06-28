@@ -8,7 +8,7 @@
 //! cargo run --example guarded
 //! ```
 
-use ce_cap::Resource;
+use ce_iam_core::Resource;
 use ce_db::{ABILITY_READ, ABILITY_WRITE, AuthPolicy, CollectionGrant};
 use ce_identity::Identity;
 
